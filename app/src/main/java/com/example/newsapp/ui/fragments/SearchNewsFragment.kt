@@ -26,8 +26,8 @@ import kotlinx.coroutines.launch
 
 class SearchNewsFragment : Fragment() {
    private lateinit var binding : FragmentSearchNewsBinding
-   lateinit var viewmodel : NewsViewmodel
-   lateinit var newsadapter : NewsAdapter
+   private lateinit var viewmodel : NewsViewmodel
+   private lateinit var newsAdapter : NewsAdapter
    val TAG = "Searching news Fragment"
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -39,73 +39,63 @@ class SearchNewsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setupRecycleView()
-
-        newsadapter.setOnItemClickListener {
-            val bundle = Bundle().apply {
-                putSerializable("article",it)
-            }
-            findNavController().navigate(
-                R.id.action_searchNewsFragment_to_articleFragment,
-                bundle
-            )
-        }
-
         viewmodel = (activity as NewsActivity).viewmodel
+
+        createRecycleView()
 
         var job : Job? = null
 
-        binding.etSearch.addTextChangedListener {editable->
+        binding.etSearch.addTextChangedListener { text->
             job?.cancel()
             job = MainScope().launch {
                 delay(SEARCH_NEWS_TIMES_DELAY)
-                editable?.let {
-                    if(editable.toString().isNotEmpty()){
-                        viewmodel.searchNews(editable.toString())
+                text?.let{
+                    if(text.toString().isNotEmpty()){
+                        viewmodel.getSearchNews(text.toString())
                     }
                 }
             }
+        }
+
+        newsAdapter.setOnItemClickListener {
+            val bundle = Bundle().apply {
+                putSerializable("article",it)
+            }
+            findNavController().navigate(R.id.action_searchNewsFragment_to_articleFragment,
+                bundle)
         }
 
         viewmodel.searchNews.observe(viewLifecycleOwner, Observer {response->
             when(response){
-                is Resource.Success ->{
-                    hideProgressbar()
-                    response.data?.let {newsResponse ->
-                        newsadapter.diifer.submitList(newsResponse.articles)
-                    }
+                is Resource.Success->{
+                    hideProgressBar()
+                    newsAdapter.diifer.submitList(response.data?.articles)
                 }
-                is Resource.Loading ->{
-                    showProgressbar()
+                is Resource.Error->{
+                    Log.e(TAG,"Error in SearchFragment")
                 }
-                is Resource.Error ->{
-                    hideProgressbar()
-                    response.massage?.let{massage->
-                        Log.e(TAG,"An error occured $massage")
-                    }
+                is Resource.Loading->{
+                    showProgressBar()
                 }
             }
-
-        })
-
+        }
+        )
     }
 
-    private fun hideProgressbar(){
+    private fun hideProgressBar(){
         binding.paginationProgressBar.visibility = View.INVISIBLE
     }
 
-
-    private fun showProgressbar(){
+    private fun showProgressBar(){
         binding.paginationProgressBar.visibility = View.VISIBLE
     }
 
-    private fun setupRecycleView(){
-        newsadapter = NewsAdapter()
-        binding.rvSearchNews.apply {
-            adapter = newsadapter
+    private fun createRecycleView(){
+        newsAdapter = NewsAdapter()
+        binding.rvSearchNews.apply{
             layoutManager = LinearLayoutManager(activity)
+            adapter = newsAdapter
         }
+
     }
-
-
 }
